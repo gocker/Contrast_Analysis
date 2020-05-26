@@ -9,6 +9,9 @@ Created on Fri Oct 25 16:27:05 2019
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set_style('white')
 
 def white_board(savepath='/Users/dan/Desktop/SSN/', max_input=40):
     run_model(savepath, max_input)
@@ -105,7 +108,7 @@ def single_run(net,
                W,
                input_strengths,
                stimulus_oris=[0,45,90],
-               sigma = 10.,
+               sigma = 30.,
                sigma_in = 30,
                n_power = 2.,
                k = 0.04,
@@ -231,16 +234,19 @@ def euler_flexible_size(net,
                         init_rates = None,
                         gain=.04,
                         power=2.,
-                        sigma=32.,
+                        sigma=30.,
+                        sigma_broad=100.,
+                        sigma_vip=30.,
                         tstop=500,
                         dt=.1,
-                        tol=0.00001):
+                        tol=0.00001,
+                        return_total_input=False):
 
     T = int(tstop/dt)
 
     dt_over_tau = [dt/20.,dt/10.,dt/20.,dt/20.]
 
-    G = get_connection_matrix(net,sigma=sigma)
+    G = get_connection_matrix(net, sigma=sigma, sigma_broad=sigma_broad, sigma_vip=sigma_vip)
 
     if init_rates is None:
         r = inputs_to_rates(eff_input,gain=gain,power=power)
@@ -270,7 +276,10 @@ def euler_flexible_size(net,
     if i==(T-1):
         print('Did not reach steady state!')
 
-    return r
+    if return_total_input:
+        return r, total_input
+    else:
+        return r
 
 def get_connection_matrix(net,ori_max=180.0,sigma=30.,sigma_broad=100.,sigma_vip=30.):
 
@@ -309,12 +318,12 @@ def get_connection_matrix(net,ori_max=180.0,sigma=30.,sigma_broad=100.,sigma_vip
 
     return conn_mat
 
-def phi(x, gain=1., power=2.):
+def phi(x, gain=.04, power=2.):
     x[x < 0.] = 0.
     return gain * (x**power)
 
 def phi_prime(x, gain=1., power=2.):
-    x[x < 0] = 0.
+    x[x < 0.] = 0.
     return gain * power * x**(power-1.)
 
 def plot_rates(rates,input_strengths,W,savename,savepath):
@@ -466,7 +475,7 @@ def plot_summed_tuning(rates,input_strengths,savepath,directions_to_sample=[0,45
 
         plot_mat = pooled_mat[cell_type].T
 
-        max_resp = 10.0#np.max(np.abs(plot_mat))
+        max_resp = 7.0#np.max(np.abs(plot_mat))
 
         plt.figure(figsize=(5,4))
         ax = plt.subplot(111)
@@ -479,7 +488,7 @@ def plot_summed_tuning(rates,input_strengths,savepath,directions_to_sample=[0,45
         ax.set_xticklabels([str(x) for x in directions_to_sample],fontsize=8)
         ax.set_title(labels[cell_type],fontsize=14)
         ax.set_aspect(1.0/ax.get_data_ratio())
-        cbar = plt.colorbar(im,ax=ax,ticks=[-10,0,10])
+        cbar = plt.colorbar(im,ax=ax,ticks=[-max_resp,0,max_resp])
         cbar.set_label('Response',fontsize=8,rotation=270,labelpad=15.0)
         plt.savefig(savepath+labels[cell_type]+'_summed_tuning.png',dpi=300)
         plt.close()
@@ -632,7 +641,7 @@ def plot_connection_distributions2(net,W,savepath):
     plt.savefig(savepath+'inhib_conn_mat.png',dpi=300)
     plt.close()
 
-def linear_stability(inputs, calc_freq=np.arange(0, 10, .01), calc_loc=0, e_sigma_narrow=30., e_sigma_broad=100., gain=0.04, power=2.):
+def linear_stability(net_inputs, W, calc_freq=np.arange(.01, 10, .01), sigma_ee=30., sigma_vipe=30, sigma_broad=100., gain=0.04, power=2.):
 
     '''
 
@@ -651,29 +660,41 @@ def linear_stability(inputs, calc_freq=np.arange(0, 10, .01), calc_loc=0, e_sigm
     rates are stable if all eigenvalues of J have negative real part)
     '''
 
-    gain = phi_prime(x=inputs, gain=gain, power=power) # population x location
-    gain = np.outer(gain[:, calc_loc], np.ones((4,))) # postsynaptic gain at target location
+    net_inputs = np.array([n[0] for n in net_inputs])
+    # print(net_inputs)
 
-    tau = 1./20. * np.ones((4, 4))
-    tau[1] = 1./10. # PV
-    gain *= tau
+    gain = np.array(phi_prime(net_inputs, gain=gain, power=power))
+    gain = np.outer(gain, np.ones((4,)))
 
-    W = connection_weights()
+    # gain = phi_prime(x=net_inputs, gain=gain, power=power) # population x location
+    # gain = np.outer(gain[:, calc_loc], np.ones((4,))) # postsynaptic gain at target location
+
+    # tau = 1./20. * np.ones((4, 4))
+    # tau[1] = 1./10. # PV
+    # gain *= tau
 
     # calculation stability at calc_loc degrees
 
     Nfreq = len(calc_freq)
-    spectral_radius = np.zeros((Nfreq,))
+    max_eig = np.zeros((Nfreq,))
+    is_isn = np.zeros((Nfreq,))
 
     for i, n in enumerate(calc_freq):
 
-        Wf = W * gain * wrapped_gaussian_fourier(n, calc_loc=calc_loc, e_sigma_narrow=e_sigma_narrow, e_sigma_broad=e_sigma_broad) # FINISH THIS LINE
+        # print(W)
+        # print(gain)
+
+        Wf = W * gain * wrapped_gaussian_fourier(n, sigma_ee=sigma_ee, sigma_vipe=sigma_vipe, sigma_broad=  sigma_broad)
+
         J = Wf - np.eye(4)
-        spectral_radius[i] = max(np.real(np.linalg.eigvals(J)))
 
-    return spectral_radius
+        Jeig = np.real(np.linalg.eigvals(J))
+        max_eig[i] = np.amax(Jeig)
+        is_isn[i] = Wf[0, 0]
 
-def wrapped_gaussian_fourier(n=0., calc_loc=0, d_ori=1., e_sigma_narrow=30., e_sigma_broad=100.):
+    return max_eig, is_isn
+
+def wrapped_gaussian_fourier(n=0., calc_loc=0, num_cells=[180, 40, 15, 15], sigma_ee=30., sigma_vipe=30, sigma_broad=100.):
 
     '''
     parameters: spatial frequency, mean, width, amplitude scaling
@@ -685,13 +706,90 @@ def wrapped_gaussian_fourier(n=0., calc_loc=0, d_ori=1., e_sigma_narrow=30., e_s
 
     Wf = np.zeros((4, 4), dtype=np.complex128)
 
-    if n < d_ori: Wf += 1./d_ori # spatially uniform (zero frequency) inhibitory projections
+    ### spatially uniform projections for different I population resolutions
+    if n < 1./num_cells[1]: Wf[:, 1] = num_cells[1] / 180.
+    if n < 1./num_cells[2]: Wf[:, 2] = num_cells[2] / 180.
+    if n < 1./num_cells[3]: Wf[:, 3] = num_cells[3] / 180.
 
-    Wf[:, 0] = 30. * np.sqrt(2/np.pi) * np.exp(-2. * (np.pi * n * e_sigma_narrow)**2 ) # e projections
-    Wf[1:3, 0] = 30. * np.sqrt(2/np.pi) * np.exp(-2. * (np.pi * n * e_sigma_broad)**2 ) # e to pv and sst have broad width
+    ### E projections
+    Wf[0, 0] = 30. * np.sqrt(2/np.pi) * np.exp(-2. * (np.pi * n * sigma_ee)**2 ) # e projections
+    Wf[1:3, 0] = 30. * np.sqrt(2/np.pi) * np.exp(-2. * (np.pi * n * sigma_broad)**2 ) # e to pv and sst have broad width
+    Wf[0, 3] = 30. * np.sqrt(2/np.pi) * np.exp(-2. * (np.pi * n * sigma_vipe)**2 ) # e projections
 
     return Wf
 
+def plot_stability(input_strength=10., stim_ori=0, sigma_in=30., sigma=30., k=.04, n_power=2., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=np.arange(.0000001, .02, .000001), savepath='figs/', savename='stability_example'):
+
+    W = connection_weights()
+    W_no_epv = W.copy()
+    W_no_epv[0, 1] = 0.
+    W_no_esst = W.copy()
+    W_no_esst[0, 2] = 0.
+    W_no_ei = W.copy()
+    W_no_ei[0, 1:] = 0.
+
+    net = init_net()
+
+    rates = []
+    ext_input = get_input_matrix(net,sigma_in,stim_ori=stim_ori)
+    ext_input = [np.ones(ext_input[i].shape) for i in range(len(ext_input))]
+
+    input_strengths = np.arange(0, input_strength+1)
+
+    rates_over_inputs = []
+    for i_input, input_strength in enumerate(input_strengths):
+        print('input: ' + str(input_strength))
+
+        # calculate total input to all of the neurons
+        eff_input = multiply_inputs(ext_input,[input_strength,input_strength,0,0])
+        eff_input = add_inputs(eff_input,spont_input)
+        eff_input = add_inputs(eff_input,run_input)
+
+        # solve for steady state
+        if i_input>0:
+            r, net_inputs = euler_flexible_size(net,
+                                   W,
+                                   eff_input,
+                                   init_rates=rates_over_inputs[-1],
+                                   gain=k,
+                                   power=n_power,
+                                   tstop=10000,
+                                   sigma=sigma,
+                                   return_total_input=True)
+        else:
+            r, net_inputs = euler_flexible_size(net,
+                                   W,
+                                   eff_input,
+                                   gain=k,
+                                   power=n_power,
+                                   tstop=10000,
+                                   sigma=sigma,
+                                   return_total_input=True)
+
+        rates_over_inputs.append(r)
+
+    spec_rad = linear_stability(net_inputs, W, calc_freq=calc_freq)
+    spec_rad_no_epv = linear_stability(net_inputs, W_no_epv, calc_freq=calc_freq)
+    spec_rad_no_esst = linear_stability(net_inputs, W_no_esst, calc_freq=calc_freq)
+    spec_rad_no_ei = linear_stability(net_inputs, W_no_ei, calc_freq=calc_freq)
+
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+    ax.plot(calc_freq, spec_rad, linewidth=2, label='full net')
+    ax.plot(calc_freq, spec_rad_no_epv, linewidth=2, label='no PV->Pyr')
+    ax.plot(calc_freq, spec_rad_no_esst, linewidth=2, label='no SST->Pyr')
+    ax.plot(calc_freq, spec_rad_no_ei, linewidth=2, label='no Inh->Pyr')
+
+    # ax.plot(calc_freq, np.zeros(len(calc_freq)), 'k--', linewidth=1)
+    ax.set_xlabel('Spatial frequency', fontsize=14)
+    ax.set_ylabel('Max eigenvalues (real part)', fontsize=14)
+    ax.legend(loc=0, frameon=False, fontsize=14)
+
+    sns.despine(fig)
+    fig.tight_layout()
+    fig.savefig(savepath+savename+'_input_'+str(input_strength)+'.png')
+
 
 if __name__ == '__main__':
-    white_board(savepath=sys.argv[1], max_input=float(sys.argv[2]))
+    # white_board(savepath=sys.argv[1], max_input=float(sys.argv[2]))
+    # plot_stability(input_strength=float(sys.argv[1]))
+    phase_portrait_cux2_projection_width()
