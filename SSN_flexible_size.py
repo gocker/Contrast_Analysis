@@ -875,6 +875,7 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
     isn_plot_sst = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
     isn_plot_sstvip = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
 
+    isn_plot_sstvip_no_sst_to_vip = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
 
 
     for i1, weight_scale in enumerate(weight_scales):
@@ -957,18 +958,10 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
                 
                 Jsstvip = J[np.ix_([0], [0, 2, 3], [0, 2, 3])]
                 isn_plot_sstvip[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsstvip)))
-                
-        #         W_no_sst_to_vip = W.copy()
-        #         W_no_sst_to_vip[3, 2] = 0.
-        #         J_no_sst_to_vip, max_eig_ii, is_isn_ii = linear_stability(net_inputs, W_no_sst_to_vip, calc_freq=calc_freq, sigma_ee=sigma, sigma_vipe=sigma_vip, sigma_broad=sigma_broad, return_matrix=True)
-                
+ 
                 Jsstvip_no_sst_to_vip = Jsstvip.copy()
                 Jsstvip_no_sst_to_vip[0, 2, 1] = 0.
                 isn_plot_sstvip_no_sst_to_vip[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsstvip_no_sst_to_vip)))
-                
-                Jsstvip_no_vip_to_sst = Jsstvip.copy()
-                Jsstvip_no_vip_to_sst[0, 1, 2] = 0.
-                isn_plot_sstvip_no_vip_to_sst[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsstvip_no_vip_to_sst)))
                 
     # save results
     W = connection_weights()
