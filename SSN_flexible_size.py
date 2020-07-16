@@ -32,7 +32,7 @@ def connection_weights():
     W[1, 2] = -0.5 # pv-som
 
     W[3, 2] = -1.0 # vip-som
-    W[2, 3] = -0.1 # som-vip,
+    W[2, 3] = -0.21 # som-vip, -.1? was -.21
 
     W[3, 1] = -0.0 # vip-pv
     W[0, 3] = -0.0 # pyr-vip
@@ -641,7 +641,7 @@ def plot_connection_distributions2(net,W,savepath):
     plt.savefig(savepath+'inhib_conn_mat.png',dpi=300)
     plt.close()
 
-def linear_stability(net_inputs, W, calc_freq=np.arange(.01, 10, .01), sigma_ee=30., sigma_vipe=30, sigma_broad=100., gain=0.04, power=2.):
+def linear_stability_matrix(net_inputs, W, calc_freq=np.arange(.01, 10, .01), sigma_ee=30., sigma_vipe=30, sigma_broad=100., gain=0.04, power=2.):
 
     '''
 
@@ -663,8 +663,8 @@ def linear_stability(net_inputs, W, calc_freq=np.arange(.01, 10, .01), sigma_ee=
     net_inputs = np.array([n[0] for n in net_inputs])
     # print(net_inputs)
 
-    gain = np.array(phi_prime(net_inputs, gain=gain, power=power))
-    gain = np.outer(gain, np.ones((4,)))
+    g = np.array(phi_prime(net_inputs, gain=gain, power=power))
+    g = np.outer(g, np.ones((4,)))
 
     # gain = phi_prime(x=net_inputs, gain=gain, power=power) # population x location
     # gain = np.outer(gain[:, calc_loc], np.ones((4,))) # postsynaptic gain at target location
@@ -675,6 +675,44 @@ def linear_stability(net_inputs, W, calc_freq=np.arange(.01, 10, .01), sigma_ee=
 
     # calculation stability at calc_loc degrees
 
+    N = W.shape[0]
+    Nfreq = len(calc_freq)
+    max_eig = np.zeros((Nfreq,))
+    is_isn = np.zeros((Nfreq,))
+
+    J = np.empty((Nfreq, N, N))
+
+    for i, n in enumerate(calc_freq):
+
+        # print(W)
+        # print(gain)
+
+        Wf = W * g * wrapped_gaussian_fourier(n, sigma_ee=sigma_ee, sigma_vipe=sigma_vipe, sigma_broad=sigma_broad)
+        J[i] = Wf
+
+    return J
+
+def linear_stability(net_inputs, W, calc_freq=np.arange(.01, 10, .01), sigma_ee=30., sigma_vipe=30, sigma_broad=100., gain=0.04, power=2., return_matrix=False):
+
+    '''
+
+    inputs: total input to each cell type at each location
+
+    cux2 = e, pv = p, sst = s, vip=v
+
+    J =
+    ((-1 + gee(x)*Wee(n))/tau_e  gep(x)*Wep(n)/tau_e  ges(x)*Wes(n)/tau_e  gev(x)*Wev(n)/tau_e
+    gpe(x)*Wpe(n)/tau_p  (-1 + gpp(x)*Wpp(n))/tau_p  gps(x)*Wps(n)/tau_p  gpv(x)*Wpv(n)/tau_p
+    gse(x)*Wse(n)/tau_s  gsp(x)*Wsp(n)/tau_s  (-1 + gss(x)*Wss(n))/tau_s  gsv(x)*Wsv(n)/tau_s
+    gve(x)*Wve(n)/tau_v  gvp(x)*Wvp(n)/tau_v  gvs(x)*Wvs(n)/tau_v  (-1 + gvv(x)*Wvv(n))/tau_v
+    )
+
+    where x is the location, n is the spatial frequency from that location, and gee is the f-I gain at the steady state rates
+    rates are stable if all eigenvalues of J have negative real part)
+    '''
+
+    Jfreq = linear_stability_matrix(net_inputs=net_inputs, W=W, calc_freq=calc_freq, sigma_ee=sigma_ee, sigma_vipe=sigma_vipe, sigma_broad=sigma_broad, gain=gain, power=power)
+
     Nfreq = len(calc_freq)
     max_eig = np.zeros((Nfreq,))
     is_isn = np.zeros((Nfreq,))
@@ -684,15 +722,17 @@ def linear_stability(net_inputs, W, calc_freq=np.arange(.01, 10, .01), sigma_ee=
         # print(W)
         # print(gain)
 
-        Wf = W * gain * wrapped_gaussian_fourier(n, sigma_ee=sigma_ee, sigma_vipe=sigma_vipe, sigma_broad=  sigma_broad)
-
-        J = Wf - np.eye(4)
+        J = Jfreq[i]
+        # Wf = W * gain * wrapped_gaussian_fourier(n, sigma_ee=sigma_ee, sigma_vipe=sigma_vipe, sigma_broad=  sigma_broad)
 
         Jeig = np.real(np.linalg.eigvals(J))
         max_eig[i] = np.amax(Jeig)
-        is_isn[i] = Wf[0, 0]
+        is_isn[i] = J[0, 0]
 
-    return max_eig, is_isn
+    if return_matrix:
+        return Jfreq, max_eig, is_isn
+    else:
+        return max_eig, is_isn
 
 def wrapped_gaussian_fourier(n=0., calc_loc=0, num_cells=[180, 40, 15, 15], sigma_ee=30., sigma_vipe=30, sigma_broad=100.):
 
@@ -700,21 +740,31 @@ def wrapped_gaussian_fourier(n=0., calc_loc=0, num_cells=[180, 40, 15, 15], sigm
     parameters: spatial frequency, mean, width, amplitude scaling
     n is presynaptic location, x is postsynaptic location
     connectivity from y to x is exp(-.5 * (y-x)^2 / sigma^2 ) / (sigma/30)
+    with integral 30 * sqrt(2 pi)
+
     where x-y is shortest distance around ring
     n is spatial frequency for y-x
     '''
 
     Wf = np.zeros((4, 4), dtype=np.complex128)
 
-    ### spatially uniform projections for different I population resolutions
-    if n < 1./num_cells[1]: Wf[:, 1] = num_cells[1] / 180.
-    if n < 1./num_cells[2]: Wf[:, 2] = num_cells[2] / 180.
-    if n < 1./num_cells[3]: Wf[:, 3] = num_cells[3] / 180.
+    # ### spatially uniform projections for different I population resolutions
+    # if n < 1./num_cells[1]: Wf[:, 1] = num_cells[1] / 180.
+    # if n < 1./num_cells[2]: Wf[:, 2] = num_cells[2] / 180.
+    # if n < 1./num_cells[3]: Wf[:, 3] = num_cells[3] / 180.
+
+    scale = 30. * np.sqrt(2/np.pi)
 
     ### E projections
-    Wf[0, 0] = 30. * np.sqrt(2/np.pi) * np.exp(-2. * (np.pi * n * sigma_ee)**2 ) # e projections
-    Wf[1:3, 0] = 30. * np.sqrt(2/np.pi) * np.exp(-2. * (np.pi * n * sigma_broad)**2 ) # e to pv and sst have broad width
-    Wf[0, 3] = 30. * np.sqrt(2/np.pi) * np.exp(-2. * (np.pi * n * sigma_vipe)**2 ) # e projections
+    Wf[0, 0] = scale * np.exp(-2. * (np.pi * n * sigma_ee)**2 ) # e projections
+    Wf[1:3, 0] = scale * np.exp(-2. * (np.pi * n * sigma_broad)**2 ) # e to pv and sst have broad width
+    Wf[3, 0] = scale * np.exp(-2. * (np.pi * n * sigma_vipe)**2 ) # e to vip projection
+
+    ### PV and SST projections have broad width
+    Wf[:, 1:3] = scale * np.exp(-2. * (np.pi * n * sigma_broad)**2 )
+
+    ### VIP projections have sigma_vip
+    Wf[:, 3] = scale * np.exp(-2. * (np.pi * n * sigma_vipe)**2 )
 
     return Wf
 
@@ -788,8 +838,148 @@ def plot_stability(input_strength=10., stim_ori=0, sigma_in=30., sigma=30., k=.0
     fig.tight_layout()
     fig.savefig(savepath+savename+'_input_'+str(input_strength)+'.png')
 
+def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, sigma=30., sigma_broad-100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop.npz'):
+
+    '''
+    loop over pv/sst fraction, vip to sst strength, and input strength
+    '''
+
+    ### initialize network
+    W = connection_weights()
+    net = init_net()
+    ext_input = get_input_matrix(net,sigma_in,stim_ori=stim_ori)
+
+    ### set up variables
+    input_strengths = np.linspace(0, 80, Npar)
+    weight_scales = np.linspace(0, max_weight_scaling, Npar)
+    weight_fractions = np.linspace(0, 1, Npar)
+
+    N1 = len(input_strengths)
+    N2 = len(weight_scaling)
+    N3 = len(weight_frac)
+    Nfreq = len(calc_freq)
+
+    Wvip_default = W[2, 3].copy()
+    Wei_tot = W[0, 1] + W[0, 2]
+
+    ### set up storage variables
+    max_eig = np.zeros((Npar, Npar, Npar))
+    max_eig_freq = np.zeros((Npar, Npar, Npar))
+    rate_plot = np.zeros((Npar, Npar, Npar)) * np.nan
+    rate_plot_pv = np.zeros((Npar, Npar, Npar)) * np.nan
+    rate_plot_sst = np.zeros((Npar, Npar, Npar)) * np.nan
+    rate_plot_vip = np.zeros((Npar, Npar, Npar)) * np.nan
+
+    isn_plot = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot_pv = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot_sst = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot_sstvip = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
+
+
+
+    for i1, weight_scale in enumerate(weight_scales):
+
+        for i2, weight_frac in enumerate(weight_fractions):
+
+            W = connection_weights()
+            
+            W[2, 3] = Wvip_default * weight_scale
+            W[0, 1] = Wei_tot * weight_scale
+            W[0, 2] = Wei_tot * (1. - weight_scale)
+
+            rates_over_inputs = []
+
+            for i3, input_strength in enumerate(input_strengths):
+
+                # print('input: ' + str(input_strength))
+
+                # calculate total input to all of the neurons
+                eff_input = multiply_inputs(ext_input,[input_strength,input_strength,0,0])
+                eff_input = add_inputs(eff_input,spont_input)
+                eff_input = add_inputs(eff_input,run_input)
+
+                # solve for steady state
+                if i_input>0:
+                    r, net_inputs = euler_flexible_size(net,
+                                        W,
+                                        eff_input,
+                                        init_rates=rates_over_inputs[-1],
+                                        gain=k,
+                                        power=n_power,
+                                        tstop=10000,
+                                        sigma=sigma,
+                                        sigma_vip=sigma_vip,
+                                        sigma_broad=sigma_broad,
+                                        return_total_input=True)
+                else:
+                    r, net_inputs = euler_flexible_size(net,
+                                        W,
+                                        eff_input,
+                                        gain=k,
+                                        power=n_power,
+                                        tstop=10000,
+                                        sigma=sigma,
+                                        sigma_vip=sigma_vip,
+                                        sigma_broad=sigma_broad,
+                                        return_total_input=True)
+
+                rates_over_inputs.append(r)
+
+                rate_plot[i_input, i1, i2] = r[0][0] # cux2 at 0 deg
+                rate_plot_pv[i_input, i1, i2] = r[1][0] # pv at 0 deg
+                rate_plot_sst[i_input, i1, i2] = r[2][0] # cux2 at 0 deg
+                rate_plot_vip[i_input, i1, i2] = r[3][0] # cux2 at 0 deg
+
+                if np.any(r[0] > 1000) or np.any(r[1] > 1000) or np.any(r[2] > 1000) or np.any(r[3] > 1000):
+                    rate_plot[i_input, i1, i2] = np.nan
+                    rate_plot_pv[i_input, i1, i2] = np.nan
+                    rate_plot_sst[i_input, i1, i2] = np.nan
+                    rate_plot_vip[i_input, i1, i2] = np.nan
+                    break
+                elif np.any(~np.isfinite(r[0])) or np.any(~np.isfinite(r[1])) or np.any(~np.isfinite(r[2])) or np.any(~np.isfinite(r[3])):
+                    rate_plot[i_input, i1, i2] = np.nan
+                    rate_plot_pv[i_input, i1, i2] = np.nan
+                    rate_plot_sst[i_input, i1, i2] = np.nan
+                    rate_plot_vip[i_input, i1, i2] = np.nan
+                    break
+                else:
+                    pass
+                
+                J, max_eig_ii, is_isn_ii = linear_stability(net_inputs, W, calc_freq=calc_freq, sigma_ee=sigma, sigma_vipe=sigma_vip, sigma_broad=sigma_broad, return_matrix=True)
+                
+                isn_plot[i_input, i1, i2] = is_isn_ii
+                
+                Jpv = J[0, :2, :2]
+                isn_plot_pv[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jpv)))
+                
+                Jsst = J[np.ix_([0], [0, 2], [0, 2])]
+                isn_plot_sst[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsst)))
+                
+                Jsstvip = J[np.ix_([0], [0, 2, 3], [0, 2, 3])]
+                isn_plot_sstvip[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsstvip)))
+                
+        #         W_no_sst_to_vip = W.copy()
+        #         W_no_sst_to_vip[3, 2] = 0.
+        #         J_no_sst_to_vip, max_eig_ii, is_isn_ii = linear_stability(net_inputs, W_no_sst_to_vip, calc_freq=calc_freq, sigma_ee=sigma, sigma_vipe=sigma_vip, sigma_broad=sigma_broad, return_matrix=True)
+                
+                Jsstvip_no_sst_to_vip = Jsstvip.copy()
+                Jsstvip_no_sst_to_vip[0, 2, 1] = 0.
+                isn_plot_sstvip_no_sst_to_vip[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsstvip_no_sst_to_vip)))
+                
+                Jsstvip_no_vip_to_sst = Jsstvip.copy()
+                Jsstvip_no_vip_to_sst[0, 1, 2] = 0.
+                isn_plot_sstvip_no_vip_to_sst[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsstvip_no_vip_to_sst)))
+                
+    # save results
+    W = connection_weights()
+    np.savez(W_default=W, pv_frac=weight_frac, vip_scale=weight_scale, input_strenghts=input_strengths, \
+        r_cux2=rate_plot, r_pv=rate_plot_pv, r_sst=rate_plot_sst, r_vip=rate_plot_vip, \
+        stab_e_e=isn_plot, stab_e_pv=isn_plot_pv, stab_e_sst=isn_plot_sst, stab_e_sst_vip=isn_plot_sstvip, \
+        stab_e_sst_vip_no_sst_to_vip=isn_plot_sstvip_no_sst_to_vip, ind_order=['input', 'vip_scale', 'pv_frac']
+    )
+
 
 if __name__ == '__main__':
     # white_board(savepath=sys.argv[1], max_input=float(sys.argv[2]))
     # plot_stability(input_strength=float(sys.argv[1]))
-    phase_portrait_cux2_projection_width()
+    run_stability_loops()
