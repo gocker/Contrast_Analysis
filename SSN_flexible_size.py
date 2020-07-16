@@ -889,7 +889,7 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
 
             rates_over_inputs = []
 
-            for i3, input_strength in enumerate(input_strengths):
+            for i_input, input_strength in enumerate(input_strengths):
 
                 # print('input: ' + str(input_strength))
 
