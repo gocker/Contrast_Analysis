@@ -838,7 +838,7 @@ def plot_stability(input_strength=10., stim_ori=0, sigma_in=30., sigma=30., k=.0
     fig.tight_layout()
     fig.savefig(savepath+savename+'_input_'+str(input_strength)+'.png')
 
-def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, sigma=30., sigma_broad-100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop.npz'):
+def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop.npz'):
 
     '''
     loop over pv/sst fraction, vip to sst strength, and input strength
