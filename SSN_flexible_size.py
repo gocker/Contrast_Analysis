@@ -855,8 +855,8 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
     weight_fractions = np.linspace(0, 1, Npar)
 
     N1 = len(input_strengths)
-    N2 = len(weight_scaling)
-    N3 = len(weight_frac)
+    N2 = len(weight_scales)
+    N3 = len(weight_fractions)
     Nfreq = len(calc_freq)
 
     Wvip_default = W[2, 3].copy()
