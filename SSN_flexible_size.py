@@ -863,8 +863,6 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
     Wei_tot = W[0, 1] + W[0, 2]
 
     ### set up storage variables
-    max_eig = np.zeros((Npar, Npar, Npar))
-    max_eig_freq = np.zeros((Npar, Npar, Npar))
     rate_plot = np.zeros((Npar, Npar, Npar)) * np.nan
     rate_plot_pv = np.zeros((Npar, Npar, Npar)) * np.nan
     rate_plot_sst = np.zeros((Npar, Npar, Npar)) * np.nan
@@ -885,8 +883,9 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
             W = connection_weights()
             
             W[2, 3] = Wvip_default * weight_scale
-            W[0, 1] = Wei_tot * weight_scale
-            W[0, 2] = Wei_tot * (1. - weight_scale)
+
+            W[0, 1] = Wei_tot * weight_frac
+            W[0, 2] = Wei_tot * (1. - weight_frac)
 
             rates_over_inputs = []
 
