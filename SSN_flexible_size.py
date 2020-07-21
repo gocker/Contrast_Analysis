@@ -964,7 +964,7 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
                 
     # save results
     W = connection_weights()
-    np.savez(file=savefile, W_default=W, pv_frac=weight_frac, vip_scale=weight_scale, input_strenghts=input_strengths, \
+    np.savez(file=savefile, W_default=W, pv_frac=weight_fractions, vip_scale=weight_scales, input_strengths=input_strengths, \
         r_cux2=rate_plot, r_pv=rate_plot_pv, r_sst=rate_plot_sst, r_vip=rate_plot_vip, \
         stab_e_e=isn_plot, stab_e_pv=isn_plot_pv, stab_e_sst=isn_plot_sst, stab_e_sst_vip=isn_plot_sstvip, \
         stab_e_sst_vip_no_sst_to_vip=isn_plot_sstvip_no_sst_to_vip, ind_order=['input', 'vip_scale', 'pv_frac']
