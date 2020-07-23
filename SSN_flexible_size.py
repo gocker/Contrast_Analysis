@@ -838,7 +838,7 @@ def plot_stability(input_strength=10., stim_ori=0, sigma_in=30., sigma=30., k=.0
     fig.tight_layout()
     fig.savefig(savepath+savename+'_input_'+str(input_strength)+'.png')
 
-def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop_Wpvsom0.3.npz'):
+def run_stability_loops(Npar=21, max_input=80, max_weight_scaling=5, max_pv_input_scaling=2, stim_ori=0, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop_Wpvsom0.3.npz'):
 
     '''
     loop over pv/sst fraction, vip to sst strength, and input strength
@@ -850,9 +850,10 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
     ext_input = get_input_matrix(net,sigma_in,stim_ori=stim_ori)
 
     ### set up variables
-    input_strengths = np.linspace(0, 80, Npar)
+    input_strengths = np.linspace(0, max_input, Npar)
     weight_scales = np.linspace(0, max_weight_scaling, Npar)
     weight_fractions = np.linspace(0, 1, Npar)
+    input_scales_pv = np.linspace(0, max_pv_input_scaling, Npar)
 
     N1 = len(input_strengths)
     N2 = len(weight_scales)
@@ -863,17 +864,17 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
     Wei_tot = W[0, 1] + W[0, 2]
 
     ### set up storage variables
-    rate_plot = np.zeros((Npar, Npar, Npar)) * np.nan
-    rate_plot_pv = np.zeros((Npar, Npar, Npar)) * np.nan
-    rate_plot_sst = np.zeros((Npar, Npar, Npar)) * np.nan
-    rate_plot_vip = np.zeros((Npar, Npar, Npar)) * np.nan
+    rate_plot = np.zeros((Npar, Npar, Npar, Npar)) * np.nan
+    rate_plot_pv = np.zeros((Npar, Npar, Npar, Npar)) * np.nan
+    rate_plot_sst = np.zeros((Npar, Npar, Npar, Npar)) * np.nan
+    rate_plot_vip = np.zeros((Npar, Npar, Npar, Npar)) * np.nan
 
-    isn_plot = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
-    isn_plot_pv = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
-    isn_plot_sst = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
-    isn_plot_sstvip = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot_pv = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot_sst = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot_sstvip = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
 
-    isn_plot_sstvip_no_sst_to_vip = np.zeros((Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot_sstvip_no_sst_to_vip = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
 
 
     for i1, weight_scale in enumerate(weight_scales):
@@ -888,87 +889,90 @@ def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0
             W[0, 1] = Wei_tot * weight_frac
             W[0, 2] = Wei_tot * (1. - weight_frac)
 
-            rates_over_inputs = []
-
             for i_input, input_strength in enumerate(input_strengths):
-
-                # print('input: ' + str(input_strength))
-
-                # calculate total input to all of the neurons
-                eff_input = multiply_inputs(ext_input,[input_strength,input_strength,0,0])
-                eff_input = add_inputs(eff_input,spont_input)
-                eff_input = add_inputs(eff_input,run_input)
-
-                # solve for steady state
-                if i_input>0:
-                    r, net_inputs = euler_flexible_size(net,
-                                        W,
-                                        eff_input,
-                                        init_rates=rates_over_inputs[-1],
-                                        gain=k,
-                                        power=n_power,
-                                        tstop=10000,
-                                        sigma=sigma,
-                                        sigma_vip=sigma_vip,
-                                        sigma_broad=sigma_broad,
-                                        return_total_input=True)
-                else:
-                    r, net_inputs = euler_flexible_size(net,
-                                        W,
-                                        eff_input,
-                                        gain=k,
-                                        power=n_power,
-                                        tstop=10000,
-                                        sigma=sigma,
-                                        sigma_vip=sigma_vip,
-                                        sigma_broad=sigma_broad,
-                                        return_total_input=True)
-
-                rates_over_inputs.append(r)
-
-                rate_plot[i_input, i1, i2] = r[0][0] # cux2 at 0 deg
-                rate_plot_pv[i_input, i1, i2] = r[1][0] # pv at 0 deg
-                rate_plot_sst[i_input, i1, i2] = r[2][0] # cux2 at 0 deg
-                rate_plot_vip[i_input, i1, i2] = r[3][0] # cux2 at 0 deg
-
-                if np.any(r[0] > 1000) or np.any(r[1] > 1000) or np.any(r[2] > 1000) or np.any(r[3] > 1000):
-                    rate_plot[i_input, i1, i2] = np.nan
-                    rate_plot_pv[i_input, i1, i2] = np.nan
-                    rate_plot_sst[i_input, i1, i2] = np.nan
-                    rate_plot_vip[i_input, i1, i2] = np.nan
-                    break
-                elif np.any(~np.isfinite(r[0])) or np.any(~np.isfinite(r[1])) or np.any(~np.isfinite(r[2])) or np.any(~np.isfinite(r[3])):
-                    rate_plot[i_input, i1, i2] = np.nan
-                    rate_plot_pv[i_input, i1, i2] = np.nan
-                    rate_plot_sst[i_input, i1, i2] = np.nan
-                    rate_plot_vip[i_input, i1, i2] = np.nan
-                    break
-                else:
-                    pass
                 
-                J, max_eig_ii, is_isn_ii = linear_stability(net_inputs, W, calc_freq=calc_freq, sigma_ee=sigma, sigma_vipe=sigma_vip, sigma_broad=sigma_broad, return_matrix=True)
-                
-                isn_plot[i_input, i1, i2] = is_isn_ii
-                
-                Jpv = J[0, :2, :2]
-                isn_plot_pv[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jpv)))
-                
-                Jsst = J[np.ix_([0], [0, 2], [0, 2])]
-                isn_plot_sst[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsst)))
-                
-                Jsstvip = J[np.ix_([0], [0, 2, 3], [0, 2, 3])]
-                isn_plot_sstvip[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsstvip)))
- 
-                Jsstvip_no_sst_to_vip = Jsstvip.copy()
-                Jsstvip_no_sst_to_vip[0, 2, 1] = 0.
-                isn_plot_sstvip_no_sst_to_vip[i_input, i1, i2] = np.amax(np.real(np.linalg.eigvals(Jsstvip_no_sst_to_vip)))
-                
+                rates_over_inputs = []
+
+                for i3, pv_input_scale in enumerate(input_scales_pv):
+
+
+                    # print('input: ' + str(input_strength))
+
+                    # calculate total input to all of the neurons
+                    eff_input = multiply_inputs(ext_input,[input_strength, pv_input_scale * input_strength, 0, 0])
+                    eff_input = add_inputs(eff_input,spont_input)
+                    eff_input = add_inputs(eff_input,run_input)
+
+                    # solve for steady state
+                    if i_input>0:
+                        r, net_inputs = euler_flexible_size(net,
+                                            W,
+                                            eff_input,
+                                            init_rates=rates_over_inputs[-1],
+                                            gain=k,
+                                            power=n_power,
+                                            tstop=10000,
+                                            sigma=sigma,
+                                            sigma_vip=sigma_vip,
+                                            sigma_broad=sigma_broad,
+                                            return_total_input=True)
+                    else:
+                        r, net_inputs = euler_flexible_size(net,
+                                            W,
+                                            eff_input,
+                                            gain=k,
+                                            power=n_power,
+                                            tstop=10000,
+                                            sigma=sigma,
+                                            sigma_vip=sigma_vip,
+                                            sigma_broad=sigma_broad,
+                                            return_total_input=True)
+
+                    rates_over_inputs.append(r)
+
+                    rate_plot[i_input, i1, i2, i3] = r[0][0] # cux2 at 0 deg
+                    rate_plot_pv[i_input, i1, i2, i3] = r[1][0] # pv at 0 deg
+                    rate_plot_sst[i_input, i1, i2, i3] = r[2][0] # cux2 at 0 deg
+                    rate_plot_vip[i_input, i1, i2, i3] = r[3][0] # cux2 at 0 deg
+
+                    if np.any(r[0] > 1000) or np.any(r[1] > 1000) or np.any(r[2] > 1000) or np.any(r[3] > 1000):
+                        rate_plot[i_input, i1, i2, i3] = np.nan
+                        rate_plot_pv[i_input, i1, i2, i3] = np.nan
+                        rate_plot_sst[i_input, i1, i2, i3] = np.nan
+                        rate_plot_vip[i_input, i1, i2, i3] = np.nan
+                        break
+                    elif np.any(~np.isfinite(r[0])) or np.any(~np.isfinite(r[1])) or np.any(~np.isfinite(r[2])) or np.any(~np.isfinite(r[3])):
+                        rate_plot[i_input, i1, i2, i3] = np.nan
+                        rate_plot_pv[i_input, i1, i2, i3] = np.nan
+                        rate_plot_sst[i_input, i1, i2, i3] = np.nan
+                        rate_plot_vip[i_input, i1, i2, i3] = np.nan
+                        break
+                    else:
+                        pass
+                    
+                    J, max_eig_ii, is_isn_ii = linear_stability(net_inputs, W, calc_freq=calc_freq, sigma_ee=sigma, sigma_vipe=sigma_vip, sigma_broad=sigma_broad, return_matrix=True)
+                    
+                    isn_plot[i_input, i1, i2, i3] = is_isn_ii
+                    
+                    Jpv = J[0, :2, :2]
+                    isn_plot_pv[i_input, i1, i2, i3] = np.amax(np.real(np.linalg.eigvals(Jpv)))
+                    
+                    Jsst = J[np.ix_([0], [0, 2], [0, 2])]
+                    isn_plot_sst[i_input, i1, i2, i3] = np.amax(np.real(np.linalg.eigvals(Jsst)))
+                    
+                    Jsstvip = J[np.ix_([0], [0, 2, 3], [0, 2, 3])]
+                    isn_plot_sstvip[i_input, i1, i2, i3] = np.amax(np.real(np.linalg.eigvals(Jsstvip)))
+    
+                    Jsstvip_no_sst_to_vip = Jsstvip.copy()
+                    Jsstvip_no_sst_to_vip[0, 2, 1] = 0.
+                    isn_plot_sstvip_no_sst_to_vip[i_input, i1, i2, i3] = np.amax(np.real(np.linalg.eigvals(Jsstvip_no_sst_to_vip)))
+                    
     # save results
     W = connection_weights()
     np.savez(file=savefile, W_default=W, pv_frac=weight_fractions, vip_scale=weight_scales, input_strengths=input_strengths, \
-        r_cux2=rate_plot, r_pv=rate_plot_pv, r_sst=rate_plot_sst, r_vip=rate_plot_vip, \
+        input_scales_pv=input_scales_pv, r_cux2=rate_plot, r_pv=rate_plot_pv, r_sst=rate_plot_sst, r_vip=rate_plot_vip, \
         stab_e_e=isn_plot, stab_e_pv=isn_plot_pv, stab_e_sst=isn_plot_sst, stab_e_sst_vip=isn_plot_sstvip, \
-        stab_e_sst_vip_no_sst_to_vip=isn_plot_sstvip_no_sst_to_vip, ind_order=['input', 'vip_scale', 'pv_frac']
+        stab_e_sst_vip_no_sst_to_vip=isn_plot_sstvip_no_sst_to_vip, ind_order=['input', 'vip_scale', 'pv_frac', 'pv_input_scale']
     )
 
 
