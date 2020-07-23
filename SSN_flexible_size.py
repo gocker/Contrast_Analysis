@@ -853,28 +853,31 @@ def run_stability_loops(Npar=21, max_input=80, max_weight_scaling=5, max_pv_inpu
     input_strengths = np.linspace(0, max_input, Npar)
     weight_scales = np.linspace(0, max_weight_scaling, Npar)
     weight_fractions = np.linspace(0, 1, Npar)
-    input_scales_pv = np.linspace(0, max_pv_input_scaling, Npar)
+
+    input_scales_pv = [.5, 1., 1.5, 2]
+    # input_scales_pv = np.linspace(0, max_pv_input_scaling, Npar)
 
     N1 = len(input_strengths)
     N2 = len(weight_scales)
     N3 = len(weight_fractions)
+    N4 = len(input_scales_pv)
     Nfreq = len(calc_freq)
 
     Wvip_default = W[2, 3].copy()
     Wei_tot = W[0, 1] + W[0, 2]
 
     ### set up storage variables
-    rate_plot = np.zeros((Npar, Npar, Npar, Npar)) * np.nan
-    rate_plot_pv = np.zeros((Npar, Npar, Npar, Npar)) * np.nan
-    rate_plot_sst = np.zeros((Npar, Npar, Npar, Npar)) * np.nan
-    rate_plot_vip = np.zeros((Npar, Npar, Npar, Npar)) * np.nan
+    rate_plot = np.zeros((N1, N2, N3, N4)) * np.nan
+    rate_plot_pv = np.zeros((N1, N2, N3, N4)) * np.nan
+    rate_plot_sst = np.zeros((N1, N2, N3, N4)) * np.nan
+    rate_plot_vip = np.zeros((N1, N2, N3, N4)) * np.nan
 
-    isn_plot = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
-    isn_plot_pv = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
-    isn_plot_sst = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
-    isn_plot_sstvip = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot = np.zeros((N1, N2, N3, N4, Nfreq)) * np.nan
+    isn_plot_pv = np.zeros((N1, N2, N3, N4, Nfreq)) * np.nan
+    isn_plot_sst = np.zeros((N1, N2, N3, N4, Nfreq)) * np.nan
+    isn_plot_sstvip = np.zeros((N1, N2, N3, N4, Nfreq)) * np.nan
 
-    isn_plot_sstvip_no_sst_to_vip = np.zeros((Npar, Npar, Npar, Npar, Nfreq)) * np.nan
+    isn_plot_sstvip_no_sst_to_vip = np.zeros((N1, N2, N3, N4, Nfreq)) * np.nan
 
 
     for i1, weight_scale in enumerate(weight_scales):
