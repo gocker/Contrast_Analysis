@@ -29,7 +29,7 @@ def connection_weights():
     W[3, 0] = 3.0 # vip-pyr
 
     W[1, 1] = -0.5 # pv-pv
-    W[1, 2] = -0.5 # pv-som
+    W[1, 2] = -0.3 # pv-som # was -.5
 
     W[3, 2] = -1.0 # vip-som
     W[2, 3] = -0.21 # som-vip, -.1? was -.21
@@ -838,7 +838,7 @@ def plot_stability(input_strength=10., stim_ori=0, sigma_in=30., sigma=30., k=.0
     fig.tight_layout()
     fig.savefig(savepath+savename+'_input_'+str(input_strength)+'.png')
 
-def run_stability_loops(Npar=81, max_input=100, max_weight_scaling=5, stim_ori=0, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop.npz'):
+def run_stability_loops(Npar=21, max_input=100, max_weight_scaling=5, stim_ori=0, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop_Wpvsom0.3.npz'):
 
     '''
     loop over pv/sst fraction, vip to sst strength, and input strength
