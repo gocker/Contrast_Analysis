@@ -907,7 +907,7 @@ def run_stability_loops(Npar=21, max_input=80, max_weight_scaling=5, max_pv_inpu
                     eff_input = add_inputs(eff_input,run_input)
 
                     # solve for steady state
-                    if i_input>0:
+                    if i3>0:
                         r, net_inputs = euler_flexible_size(net,
                                             W,
                                             eff_input,
