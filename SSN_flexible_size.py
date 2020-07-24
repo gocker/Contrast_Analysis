@@ -838,7 +838,7 @@ def plot_stability(input_strength=10., stim_ori=0, sigma_in=30., sigma=30., k=.0
     fig.tight_layout()
     fig.savefig(savepath+savename+'_input_'+str(input_strength)+'.png')
 
-def run_stability_loops(Npar=21, max_input=80, max_weight_scaling=5, max_pv_input_scaling=2, stim_ori=0, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop_Wpvsom0.3.npz'):
+def run_stability_loops(Ncoarse=21, Nfine=81, max_input=80, max_weight_scaling=5, max_pv_input_scaling=2, stim_ori=0, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop_Wpvsom0.3.npz'):
 
     '''
     loop over pv/sst fraction, vip to sst strength, and input strength
@@ -850,9 +850,9 @@ def run_stability_loops(Npar=21, max_input=80, max_weight_scaling=5, max_pv_inpu
     ext_input = get_input_matrix(net,sigma_in,stim_ori=stim_ori)
 
     ### set up variables
-    input_strengths = np.linspace(0, max_input, Npar)
-    weight_scales = np.linspace(0, max_weight_scaling, Npar)
-    weight_fractions = np.linspace(0, 1, Npar)
+    input_strengths = np.linspace(0, max_input, Nfine)
+    weight_scales = np.linspace(0, max_weight_scaling, Ncoarse)
+    weight_fractions = np.linspace(0, 1, Ncoarse)
 
     input_scales_pv = [.5, 1., 1.5, 2]
     # input_scales_pv = np.linspace(0, max_pv_input_scaling, Npar)
@@ -881,7 +881,7 @@ def run_stability_loops(Npar=21, max_input=80, max_weight_scaling=5, max_pv_inpu
 
 
     for i1, weight_scale in enumerate(weight_scales):
-        print('{}/{}'.format(i1, Npar))
+        print('{}/{}'.format(i1, N1))
 
         for i2, weight_frac in enumerate(weight_fractions):
 
@@ -892,12 +892,11 @@ def run_stability_loops(Npar=21, max_input=80, max_weight_scaling=5, max_pv_inpu
             W[0, 1] = Wei_tot * weight_frac
             W[0, 2] = Wei_tot * (1. - weight_frac)
 
-            for i_input, input_strength in enumerate(input_strengths):
-                
+            for i3, pv_input_scale in enumerate(input_scales_pv):
+
                 rates_over_inputs = []
 
-                for i3, pv_input_scale in enumerate(input_scales_pv):
-
+                for i_input, input_strength in enumerate(input_strengths):
 
                     # print('input: ' + str(input_strength))
 
