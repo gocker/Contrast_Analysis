@@ -881,7 +881,7 @@ def run_stability_loops(Ncoarse=21, Nfine=81, max_input=80, max_weight_scaling=5
 
 
     for i1, weight_scale in enumerate(weight_scales):
-        print('{}/{}'.format(i1, N1))
+        print('{}/{}'.format(i1, N2))
 
         for i2, weight_frac in enumerate(weight_fractions):
 
