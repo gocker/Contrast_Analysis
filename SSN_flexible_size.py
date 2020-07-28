@@ -838,7 +838,7 @@ def plot_stability(input_strength=10., stim_ori=0, sigma_in=30., sigma=30., k=.0
     fig.tight_layout()
     fig.savefig(savepath+savename+'_input_'+str(input_strength)+'.png')
 
-def run_stability_loops(Ncoarse=21, Nfine=81, max_input=80, max_weight_scaling=5, max_pv_input_scaling=2, stim_ori=0, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop_Wpvsom0.3.npz'):
+def run_stability_loops(Ncoarse=21, Nfine=161, max_input=80, max_weight_scaling=5, max_pv_input_scaling=2, stim_ori=0, sigma=30., sigma_broad=100., sigma_vip=30., sigma_in=30., spont_input=[2,2,2,10], run_input=[0,0,0,0], calc_freq=[0.], k=.04, n_power=2., savefile='data_par_loop_Wpvsom0.3.npz'):
 
     '''
     loop over pv/sst fraction, vip to sst strength, and input strength
@@ -854,7 +854,7 @@ def run_stability_loops(Ncoarse=21, Nfine=81, max_input=80, max_weight_scaling=5
     weight_scales = np.linspace(0, max_weight_scaling, Ncoarse)
     weight_fractions = np.linspace(0, 1, Ncoarse)
 
-    input_scales_pv = [.5, 1., 1.5, 2]
+    input_scales_pv = [.5, 1., 1.5]
     # input_scales_pv = np.linspace(0, max_pv_input_scaling, Npar)
 
     N1 = len(input_strengths)
